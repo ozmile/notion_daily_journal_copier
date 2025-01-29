@@ -92,8 +92,9 @@ class NotionJournalManager:
                 converted.append(text)
         return converted
 
+    # TODO: ブロックの複製処理をリファクタリングしてAPIリクエストを減らしたい
     def copy_blocks(self, source_id: str, target_id: str) -> bool:
-        """ブロックを再帰的にコピーして順番を維持"""
+        """ブロックを再帰的に複製して順番を維持"""
         try:
             blocks = self.client.blocks.children.list(source_id)
             for block in blocks.get('results', []):
