@@ -79,10 +79,27 @@ class NotionJournalManager:
 
         for block in blocks['results']:
             block_type = block['type']
-            block_content = block[block_type]
+            block_content = block[block_type].copy()
 
+
+            # Notion APIはlink_mentionタイプを直接サポートしていないため、
+            # リンクメンションをテキストに変換する
             if 'rich_text' in block_content:
-                block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
+                rich_text = []
+                for text in block_content['rich_text']:
+                    if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
+                        rich_text.append({
+                            'type': 'text',
+                            'text': {
+                                'content': text['plain_text'],
+                                'link': {'url': text['href']}
+                            },
+                            'annotations': text.get('annotations', {}),
+                            'plain_text': text['plain_text']
+                        })
+                    else:
+                        rich_text.append(text)
+                block_content['rich_text'] = rich_text
 
             new_block = {
                 "object": "block",
@@ -90,14 +107,11 @@ class NotionJournalManager:
                 block_type: block_content
             }
 
-            # 新しいブロックを作成
-            breakpoint()
             created_block = self.notion.blocks.children.append(
                 block_id=target_block_id,
                 children=[new_block]
             )
 
-            # 子ブロックを持つ場合は再帰的にコピー
             if block.get('has_children'):
                 self.copy_blocks(block['id'], created_block['results'][0]['id'])
 
