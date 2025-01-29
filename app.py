@@ -55,19 +55,19 @@ class NotionJournalManager:
             return None
 
     def _convert_rich_text(self, rich_text: List[Dict]) -> List[Dict]:
-        """rich_textの構造を変換"""
+        """link_mentionをテキストリンクに変換"""
         converted = []
         for text in rich_text:
             if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
                 # リンクメンションをテキストに変換
                 converted.append({
-                    "type": "text",
-                    "text": {
-                        "content": text['plain_text'],
-                        "link": {"url": text['href']}
+                    'type': 'text',
+                    'text': {
+                        'content': text['plain_text'],
+                        'link': {'url': text['href']}
                     },
-                    "annotations": text['annotations'],
-                    "plain_text": text['plain_text']
+                    'annotations': text.get('annotations', {}),
+                    'plain_text': text['plain_text']
                 })
             else:
                 converted.append(text)
@@ -81,25 +81,8 @@ class NotionJournalManager:
             block_type = block['type']
             block_content = block[block_type].copy()
 
-
-            # Notion APIはlink_mentionタイプを直接サポートしていないため、
-            # リンクメンションをテキストに変換する
             if 'rich_text' in block_content:
-                rich_text = []
-                for text in block_content['rich_text']:
-                    if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
-                        rich_text.append({
-                            'type': 'text',
-                            'text': {
-                                'content': text['plain_text'],
-                                'link': {'url': text['href']}
-                            },
-                            'annotations': text.get('annotations', {}),
-                            'plain_text': text['plain_text']
-                        })
-                    else:
-                        rich_text.append(text)
-                block_content['rich_text'] = rich_text
+                block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
 
             new_block = {
                 "object": "block",
