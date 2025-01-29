@@ -11,7 +11,7 @@
 リポジトリをクローンします。
 
 ```.bash
-git clone https://github.com/ozmile/notion-daily-journal.git
+git clone https://github.com/ozmile/notion_client.git
 cd notion-daily-journal
 ```
 
