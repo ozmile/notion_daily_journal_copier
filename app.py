@@ -55,40 +55,52 @@ class NotionJournalManager:
             return None
 
     def duplicate_page(self, source_page: Dict, target_date: datetime) -> Optional[Dict]:
-        """ページを複製して新しい日付で作成"""
+        """ページを丸ごと複製"""
         try:
-            # 既存ページのコンテンツを取得
-            source_blocks = self.notion.blocks.children.list(source_page['id'])
+            # ソースページの完全な情報を取得
+            page_content = self.notion.pages.retrieve(source_page['id'])
+            logger.info(f"ソースページ取得: {page_content['id']}")
+
+            # 新しいページのプロパティを準備
+            date_str = target_date.strftime('%Y-%m-%d')
+            new_properties = page_content['properties'].copy()
+            new_properties['タイトル']['title'][0]['text']['content'] = f"Daily Journal {date_str}"
+            new_properties['作成日']['date']['start'] = date_str
 
             # 新しいページを作成
-            date_str = target_date.strftime('%Y-%m-%d')
             new_page = self.notion.pages.create(
                 parent={"database_id": self.database_id},
-                properties={
-                    "タイトル": {
-                        "title": [{"text": {"content": f"Daily Journal {date_str}"}}]
-                    },
-                    "作成日": {
-                        "date": {"start": date_str}
-                    }
-                }
+                properties=new_properties,
+                icon=page_content.get('icon'),
+                cover=page_content.get('cover')
             )
+            logger.info(f"新規ページ作成: {new_page['id']}")
 
-            # コンテンツをコピー
-            if 'results' in source_blocks:
-                for block in source_blocks['results']:
-                    # ブロックタイプとコンテンツを保持
-                    block_data = {
+            # ソースページのコンテンツを複製
+            blocks = self.notion.blocks.children.list(page_content['id'])
+            logger.info(f"取得したブロック数: {len(blocks.get('results', []))}")
+
+            if blocks.get('results'):
+                processed_blocks = []
+                for block in blocks['results']:
+                    block_type = block['type']
+                    # 各ブロックタイプに応じた処理
+                    processed_block = {
                         "object": "block",
-                        "type": block['type'],
-                        block['type']: block[block['type']]
+                        "type": block_type,
+                        block_type: block[block_type]
                     }
-                    # 新しいページにブロックを追加
-                    self.notion.blocks.children.append(
-                        block_id=new_page['id'],
-                        children=[block_data]
-                    )
-                logger.info("コンテンツを複製しました")
+                    # calloutブロックの特別処理
+                    if block_type == 'callout' and processed_block[block_type].get('icon') is None:
+                        del processed_block[block_type]['icon']
+                    processed_blocks.append(processed_block)
+
+                # 処理したブロックを新しいページに追加
+                self.notion.blocks.children.append(
+                    block_id=new_page['id'],
+                    children=processed_blocks
+                )
+                logger.info(f"コンテンツ複製完了: {len(processed_blocks)}ブロック")
 
             return new_page
 
