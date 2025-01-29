@@ -3,16 +3,16 @@
 このスクリプトは、Notion API を利用して、前日の日報ページを自動的に複製し、新しい日報ページを作成します。これにより、手動でのコピー作業を省略し、日々の業務報告の作成を効率化できます。
 
 ## 必要条件
-Python 3.8 以上
-Notion API キー
-Notion データベース ID
+- Python 3.8 以上
+- Notion API キー
+- Notion データベース ID
 
 ## インストール
 リポジトリをクローンします。
 
 ```.bash
-git clone https://github.com/ozmile/notion-daily-journal.git
-cd notion-daily-journal
+git clone https://github.com/ozmile/notion_client.git
+cd notion_client
 ```
 
 必要なパッケージをインストールします。
@@ -22,7 +22,14 @@ pip install -r requirements.txt
 ```
 
 ## 環境変数の設定
-プロジェクトのルートディレクトリに .env ファイルを作成し、以下の環境変数を設定します。
+### Notion API キーの取得
+Notion API のサイトで新規インテグレーション（Internalタイプ）を作成し、Tokenをコピーして `NOTION_API_KEY`に設定。
+
+### データベース ID の取得
+Notionの日報データベースを開き、URL内の`https://www.notion.so/workspace/【データベースID】?v=...` からデータベースIDをコピーし、`NOTION_DAILY_JOURNAL_DATABASE_ID`に設定。
+
+### .env ファイルの作成
+プロジェクトのルートディレクトリに .env を作成し、以下を記述：
 
 ```.bash
 NOTION_API_KEY=your_api_key
@@ -30,11 +37,15 @@ NOTION_DAILY_JOURNAL_DATABASE_ID=your_database_id
 ```
 ※お好みで .bashrc などに設定しても構いません。
 
+### Notion のページでコネクトを有効化
+1. データベースを開き、ページ右上の「...」をクリック
+2. 「コネクト」を選択し、作成したインテグレーションを追加
+
 ## 使用方法
 環境変数を設定した後、以下のコマンドでスクリプトを実行できます。
 
 ```.bash
-python daily_journal_manager.py
+python app.py
 ```
 スクリプトを定期的に実行することで、毎日自動的に前日の日報が複製されます。
 
