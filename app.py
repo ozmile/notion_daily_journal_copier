@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from notion_client import Client, APIResponseError
 
 # Logging configuration
@@ -54,6 +54,53 @@ class NotionJournalManager:
             logger.error(f"An unexpected error occurred: {e}")
             return None
 
+    def _convert_rich_text(self, rich_text: List[Dict]) -> List[Dict]:
+        """rich_textの構造を変換"""
+        converted = []
+        for text in rich_text:
+            if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
+                # リンクメンションをテキストに変換
+                converted.append({
+                    "type": "text",
+                    "text": {
+                        "content": text['plain_text'],
+                        "link": {"url": text['href']}
+                    },
+                    "annotations": text['annotations'],
+                    "plain_text": text['plain_text']
+                })
+            else:
+                converted.append(text)
+        return converted
+
+    def copy_blocks(self, block_id: str, target_block_id: str):
+        """ブロックを再帰的にコピー"""
+        blocks = self.notion.blocks.children.list(block_id)
+
+        for block in blocks['results']:
+            block_type = block['type']
+            block_content = block[block_type]
+
+            if 'rich_text' in block_content:
+                block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
+
+            new_block = {
+                "object": "block",
+                "type": block_type,
+                block_type: block_content
+            }
+
+            # 新しいブロックを作成
+            breakpoint()
+            created_block = self.notion.blocks.children.append(
+                block_id=target_block_id,
+                children=[new_block]
+            )
+
+            # 子ブロックを持つ場合は再帰的にコピー
+            if block.get('has_children'):
+                self.copy_blocks(block['id'], created_block['results'][0]['id'])
+
     def duplicate_page(self, source_page: Dict, target_date: datetime) -> Optional[Dict]:
         """ページを丸ごと複製"""
         try:
@@ -78,29 +125,9 @@ class NotionJournalManager:
             )
             logger.info(f"新規ページ作成: {new_page['id']}")
 
-            # ブロックの複製処理
-            blocks = self.notion.blocks.children.list(page_content['id'])
-
-            if blocks.get('results'):
-                for block in blocks['results']:
-                    block_type = block['type']
-
-                    # rich_textが空の場合はスキップ
-                    if block_type in block and 'rich_text' in block[block_type] and not block[block_type]['rich_text']:
-                        logger.debug(f"空のブロックをスキップ: {block['id']}")
-                        continue
-
-                    new_block = {
-                        "object": "block",
-                        "type": block_type,
-                        block_type: block[block_type]
-                    }
-
-                    # ブロックを追加
-                    self.notion.blocks.children.append(
-                        block_id=new_page['id'],
-                        children=[new_block]
-                    )
+            # ブロックの複製処理を実行
+            self.copy_blocks(page_content['id'], new_page['id'])
+            logger.info("ブロックの複製が完了しました")
 
             return new_page
 
