@@ -84,18 +84,32 @@ class NotionJournalManager:
                 processed_blocks = []
                 for block in blocks['results']:
                     block_type = block['type']
-                    # 各ブロックタイプに応じた処理
+                    block_content = block[block_type]
+
+                    # テキストコンテンツの処理
+                    if 'rich_text' in block_content:
+                        for text in block_content['rich_text']:
+                            if 'text' in text:
+                                # リンクと注釈を保持
+                                text_data = {
+                                    'type': text.get('type', 'text'),
+                                    'text': {
+                                        'content': text['text']['content'],
+                                        'link': text['text'].get('link')
+                                    },
+                                    'annotations': text.get('annotations', {}),
+                                    'plain_text': text.get('plain_text', ''),
+                                    'href': text.get('href')
+                                }
+
                     processed_block = {
                         "object": "block",
                         "type": block_type,
-                        block_type: block[block_type]
+                        block_type: block_content
                     }
-                    # calloutブロックの特別処理
-                    if block_type == 'callout' and processed_block[block_type].get('icon') is None:
-                        del processed_block[block_type]['icon']
                     processed_blocks.append(processed_block)
 
-                # 処理したブロックを新しいページに追加
+                # ブロックの一括追加
                 self.notion.blocks.children.append(
                     block_id=new_page['id'],
                     children=processed_blocks
