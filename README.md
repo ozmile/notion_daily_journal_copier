@@ -35,7 +35,6 @@ Notionの日報データベースを開き、URL内の`https://www.notion.so/wor
 NOTION_API_KEY=your_api_key
 NOTION_DAILY_JOURNAL_DATABASE_ID=your_database_id
 ```
-※お好みで .bashrc などに設定しても構いません。
 
 ### Notion のページでコネクトを有効化
 1. データベースを開き、ページ右上の「...」をクリック

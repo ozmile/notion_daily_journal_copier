@@ -1,9 +1,13 @@
-import os
 import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any
-from notion_client import Client, APIResponseError
+import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+from notion_client import Client, APIResponseError
+from typing import Optional, Dict, List, Any
+
+# .env の環境変数を読み込む
+load_dotenv()
 
 # ロギング設定
 logging.basicConfig(
