@@ -1,4 +1,4 @@
-# Notion Daily Journal Manager
+# Notion Daily Journal Copier
 ## 概要
 このスクリプトは、Notion API を利用して、前日の日報ページを自動的に複製し、新しい日報ページを作成します。これにより、手動でのコピー作業を省略し、日々の業務報告の作成を効率化できます。
 
@@ -11,8 +11,8 @@
 リポジトリをクローンします。
 
 ```.bash
-git clone https://github.com/ozmile/notion_client.git
-cd notion_client
+git clone https://github.com/ozmile/notion_daily_journal_copier.git
+cd notion_daily_journal_copier
 ```
 
 必要なパッケージをインストールします。
