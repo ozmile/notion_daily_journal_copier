@@ -62,10 +62,13 @@ class NotionJournalManager:
             logger.info(f"ソースページ取得: {page_content['id']}")
 
             # 新しいページのプロパティを準備
-            date_str = target_date.strftime('%Y-%m-%d')
+            today = datetime.now()
+            date_str = today.strftime('%Y-%m-%d')
             new_properties = page_content['properties'].copy()
-            new_properties['タイトル']['title'][0]['text']['content'] = f"Daily Journal {date_str}"
+            # breakpoint()
+            new_properties['タイトル']['title'][0]['text']['content'] = f"Daily Journal"
             new_properties['作成日']['date']['start'] = date_str
+            new_properties['タイトル']['title'][1]['mention']['date']['start'] = date_str
 
             # 新しいページを作成
             new_page = self.notion.pages.create(
