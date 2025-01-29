@@ -59,7 +59,8 @@ class NotionJournalManager:
         converted = []
         for text in rich_text:
             if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
-                # リンクメンションをテキストに変換
+                # Notion API を介してデータを操作する際、リンクメンションをそのまま扱うと、
+                # 期待通りに表示されない場合があるので、リンクメンションをテキストに変換
                 converted.append({
                     'type': 'text',
                     'text': {
