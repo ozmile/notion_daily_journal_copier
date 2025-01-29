@@ -54,13 +54,14 @@ class NotionJournalManager:
             logger.error(f"An unexpected error occurred: {e}")
             return None
 
+    # Notion API を介してデータを操作する際、リンクメンションをそのまま扱うと、
+    # 期待通りに表示されない場合があるので、リンクメンションをテキストに変換
     def _convert_rich_text(self, rich_text: List[Dict]) -> List[Dict]:
         """link_mentionをテキストリンクに変換"""
         converted = []
         for text in rich_text:
             if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
-                # Notion API を介してデータを操作する際、リンクメンションをそのまま扱うと、
-                # 期待通りに表示されない場合があるので、リンクメンションをテキストに変換
+
                 converted.append({
                     'type': 'text',
                     'text': {
