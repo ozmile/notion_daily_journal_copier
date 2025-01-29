@@ -74,6 +74,22 @@ class NotionJournalManager:
                 }
             )
 
+            # コンテンツをコピー
+            if 'results' in source_blocks:
+                for block in source_blocks['results']:
+                    # ブロックタイプとコンテンツを保持
+                    block_data = {
+                        "object": "block",
+                        "type": block['type'],
+                        block['type']: block[block['type']]
+                    }
+                    # 新しいページにブロックを追加
+                    self.notion.blocks.children.append(
+                        block_id=new_page['id'],
+                        children=[block_data]
+                    )
+                logger.info("コンテンツを複製しました")
+
             return new_page
 
         except Exception as e:
