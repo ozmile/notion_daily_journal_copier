@@ -92,31 +92,58 @@ class NotionJournalManager:
                 converted.append(text)
         return converted
 
-    # TODO: ブロックの複製処理をリファクタリングしてAPIリクエストを減らしたい
-    def copy_blocks(self, source_id: str, target_id: str) -> bool:
-        """ブロックを再帰的に複製して順番を維持"""
+    def copy_blocks(self, source_id: str, target_id: str, batch_size: int = 100) -> bool:
+        """ブロックを再帰的に複製"""
         try:
-            blocks = self.client.blocks.children.list(source_id)
-            for block in blocks.get('results', []):
+            # すべてのブロックを一度に取得
+            blocks_buffer = []
+            has_more = True
+            start_cursor = None
+
+            while has_more:
+                response = self.client.blocks.children.list(
+                    block_id=source_id,
+                    start_cursor=start_cursor,
+                    page_size=batch_size
+                )
+                blocks_buffer.extend(response['results'])
+                has_more = response.get('has_more', False)
+                start_cursor = response.get('next_cursor')
+
+            # バッチ処理用の新しいブロックを準備
+            new_blocks = []
+            for block in blocks_buffer:
                 block_type = block['type']
                 block_content = block[block_type].copy()
 
+                # リッチテキストの変換
                 if 'rich_text' in block_content:
                     block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
 
-                new_block = {
+                new_blocks.append({
                     "object": "block",
                     "type": block_type,
                     block_type: block_content
-                }
+                })
 
-                created = self.client.blocks.children.append(
+            # バッチでブロックを追加
+            created_blocks = []
+            for i in range(0, len(new_blocks), batch_size):
+                batch = new_blocks[i:i + batch_size]
+                response = self.client.blocks.children.append(
                     block_id=target_id,
-                    children=[new_block]
+                    children=batch
                 )
+                created_blocks.extend(response['results'])
 
-                if block.get('has_children'):
-                    self.copy_blocks(block['id'], created['results'][0]['id'])
+            # 子ブロックを持つものを再帰的に処理
+            for source_block, created_block in zip(blocks_buffer, created_blocks):
+                if source_block.get('has_children'):
+                    self.copy_blocks(
+                        source_block['id'],
+                        created_block['id'],
+                        batch_size=batch_size
+                    )
 
             return True
 
