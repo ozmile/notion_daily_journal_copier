@@ -65,7 +65,6 @@ class NotionJournalManager:
             today = datetime.now()
             date_str = today.strftime('%Y-%m-%d')
             new_properties = page_content['properties'].copy()
-            # breakpoint()
             new_properties['タイトル']['title'][0]['text']['content'] = f"Daily Journal"
             new_properties['作成日']['date']['start'] = date_str
             new_properties['タイトル']['title'][1]['mention']['date']['start'] = date_str
@@ -79,45 +78,29 @@ class NotionJournalManager:
             )
             logger.info(f"新規ページ作成: {new_page['id']}")
 
-            # ソースページのコンテンツを複製
+            # ブロックの複製処理
             blocks = self.notion.blocks.children.list(page_content['id'])
-            logger.info(f"取得したブロック数: {len(blocks.get('results', []))}")
 
             if blocks.get('results'):
-                processed_blocks = []
                 for block in blocks['results']:
                     block_type = block['type']
-                    block_content = block[block_type]
 
-                    # テキストコンテンツの処理
-                    if 'rich_text' in block_content:
-                        for text in block_content['rich_text']:
-                            if 'text' in text:
-                                # リンクと注釈を保持
-                                text_data = {
-                                    'type': text.get('type', 'text'),
-                                    'text': {
-                                        'content': text['text']['content'],
-                                        'link': text['text'].get('link')
-                                    },
-                                    'annotations': text.get('annotations', {}),
-                                    'plain_text': text.get('plain_text', ''),
-                                    'href': text.get('href')
-                                }
+                    # rich_textが空の場合はスキップ
+                    if block_type in block and 'rich_text' in block[block_type] and not block[block_type]['rich_text']:
+                        logger.debug(f"空のブロックをスキップ: {block['id']}")
+                        continue
 
-                    processed_block = {
+                    new_block = {
                         "object": "block",
                         "type": block_type,
-                        block_type: block_content
+                        block_type: block[block_type]
                     }
-                    processed_blocks.append(processed_block)
 
-                # ブロックの一括追加
-                self.notion.blocks.children.append(
-                    block_id=new_page['id'],
-                    children=processed_blocks
-                )
-                logger.info(f"コンテンツ複製完了: {len(processed_blocks)}ブロック")
+                    # ブロックを追加
+                    self.notion.blocks.children.append(
+                        block_id=new_page['id'],
+                        children=[new_block]
+                    )
 
             return new_page
 
