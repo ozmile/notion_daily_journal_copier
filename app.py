@@ -1,67 +1,80 @@
 import os
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from notion_client import Client, APIResponseError
+from dataclasses import dataclass
 
-# Logging configuration
+# ロギング設定
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+@dataclass
+class NotionConfig:
+    api_key: str
+    database_id: str
+
+class NotionError(Exception):
+    """Notionの操作に関するカスタムエラー"""
+    pass
+
 class NotionJournalManager:
-    def __init__(self):
-        self.api_key = os.environ.get("NOTION_API_KEY")
-        self.database_id = os.environ.get("NOTION_DAILY_JOURNAL_DATABASE_ID")
+    def __init__(self, config: Optional[NotionConfig] = None):
+        if config is None:
+            api_key = os.environ.get("NOTION_API_KEY")
+            database_id = os.environ.get("NOTION_DAILY_JOURNAL_DATABASE_ID")
 
-        if not self.api_key or not self.database_id:
-            logger.error("Environment variables are not set.")
-            raise ValueError("Environment variables are not set.")
+            if not api_key or not database_id:
+                raise NotionError("環境変数が設定されていません")
 
-        self.notion = Client(auth=self.api_key)
+            self.config = NotionConfig(api_key, database_id)
+        else:
+            self.config = config
 
-    def get_page_by_date(self, target_date: datetime) -> Optional[Dict]:
-        """Retrieve the page for the specified date."""
+        self.client = Client(auth=self.config.api_key)
+
+    def get_page_by_date(self, target_date: datetime) -> Optional[Dict[str, Any]]:
+        """指定日付のページを取得"""
         date_str = target_date.strftime('%Y-%m-%d')
-        query_params = {
-            "database_id": self.database_id,
-            "filter": {
-                "property": "作成日",
-                "date": {
-                    "equals": date_str
-                }
-            },
-            "page_size": 1,
-            "sorts": [{
-                "property": "作成日",
-                "direction": "descending"
-            }]
-        }
-
         try:
-            response = self.notion.databases.query(**query_params)
-            if 'results' in response and response['results']:
-                return response['results'][0]
-            else:
-                logger.warning("No results found for the specified date.")
-                return None
+            response = self.client.databases.query(
+                database_id=self.config.database_id,
+                filter={
+                    "property": "作成日",
+                    "date": {"equals": date_str}
+                },
+                page_size=1,
+                sorts=[{"property": "作成日", "direction": "descending"}]
+            )
+            return response['results'][0] if response.get('results') else None
+
         except APIResponseError as e:
-            logger.error(f"API response error: {e}")
+            logger.error(f"APIエラー: {e}")
             return None
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}")
+
+    def create_page(self, properties: Dict[str, Any], icon: Optional[Dict] = None,
+                   cover: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+        """新規ページを作成"""
+        try:
+            return self.client.pages.create(
+                parent={"database_id": self.config.database_id},
+                properties=properties,
+                icon=icon,
+                cover=cover
+            )
+        except APIResponseError as e:
+            logger.error(f"ページ作成エラー: {e}")
             return None
 
     # Notion API を介してデータを操作する際、リンクメンションをそのまま扱うと、
-    # 期待通りに表示されない場合があるので、リンクメンションをテキストに変換
+    # 期待通りに表示されない場合があるので、リンクメンションをlink形式に変換
     def _convert_rich_text(self, rich_text: List[Dict]) -> List[Dict]:
-        """link_mentionをテキストリンクに変換"""
         converted = []
         for text in rich_text:
             if text['type'] == 'mention' and text['mention']['type'] == 'link_mention':
-
                 converted.append({
                     'type': 'text',
                     'text': {
@@ -75,73 +88,82 @@ class NotionJournalManager:
                 converted.append(text)
         return converted
 
-    def copy_blocks(self, block_id: str, target_block_id: str):
+    def copy_blocks(self, source_id: str, target_id: str) -> bool:
         """ブロックを再帰的にコピー"""
-        blocks = self.notion.blocks.children.list(block_id)
-
-        for block in blocks['results']:
-            block_type = block['type']
-            block_content = block[block_type].copy()
-
-            if 'rich_text' in block_content:
-                block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
-
-            new_block = {
-                "object": "block",
-                "type": block_type,
-                block_type: block_content
-            }
-
-            created_block = self.notion.blocks.children.append(
-                block_id=target_block_id,
-                children=[new_block]
-            )
-
-            if block.get('has_children'):
-                self.copy_blocks(block['id'], created_block['results'][0]['id'])
-
-    def duplicate_page(self, source_page: Dict, target_date: datetime) -> Optional[Dict]:
-        """ページを丸ごと複製"""
         try:
-            # ソースページの完全な情報を取得
-            page_content = self.notion.pages.retrieve(source_page['id'])
-            logger.info(f"ソースページ取得: {page_content['id']}")
+            blocks = self.client.blocks.children.list(source_id)
+            for block in blocks.get('results', []):
+                block_type = block['type']
+                block_content = block[block_type].copy()
 
-            # 新しいページのプロパティを準備
-            today = datetime.now()
-            date_str = today.strftime('%Y-%m-%d')
+                if 'rich_text' in block_content:
+                    block_content['rich_text'] = self._convert_rich_text(block_content['rich_text'])
+
+                new_block = {
+                    "object": "block",
+                    "type": block_type,
+                    block_type: block_content
+                }
+
+                created = self.client.blocks.children.append(
+                    block_id=target_id,
+                    children=[new_block]
+                )
+
+                if block.get('has_children'):
+                    self.copy_blocks(block['id'], created['results'][0]['id'])
+
+            return True
+
+        except APIResponseError as e:
+            logger.error(f"ブロックコピーエラー: {e}")
+            return False
+
+    def duplicate_daily_journal(self) -> Optional[Dict[str, Any]]:
+        """日報を複製"""
+        try:
+            yesterday = datetime.now() - timedelta(days=1)
+            source_page = self.get_page_by_date(yesterday)
+
+            if not source_page:
+                logger.info("前日のページが見つかりません")
+                return None
+
+            page_content = self.client.pages.retrieve(source_page['id'])
+
+            # プロパティの更新
+            date_str = datetime.now().strftime('%Y-%m-%d')
             new_properties = page_content['properties'].copy()
-            new_properties['タイトル']['title'][0]['text']['content'] = f"Daily Journal"
+            new_properties['タイトル']['title'][0]['text']['content'] = "Daily Journal"
             new_properties['作成日']['date']['start'] = date_str
             new_properties['タイトル']['title'][1]['mention']['date']['start'] = date_str
 
-            # 新しいページを作成
-            new_page = self.notion.pages.create(
-                parent={"database_id": self.database_id},
+            # 新規ページ作成
+            new_page = self.create_page(
                 properties=new_properties,
                 icon=page_content.get('icon'),
                 cover=page_content.get('cover')
             )
-            logger.info(f"新規ページ作成: {new_page['id']}")
 
-            # ブロックの複製処理を実行
-            self.copy_blocks(page_content['id'], new_page['id'])
-            logger.info("ブロックの複製が完了しました")
+            if new_page and self.copy_blocks(page_content['id'], new_page['id']):
+                logger.info(f"日報を複製しました: {new_page['id']}")
+                return new_page
 
-            return new_page
-
-        except Exception as e:
-            logger.error(f"ページの複製中にエラーが発生: {e}")
             return None
 
-if __name__ == '__main__':
-    manager = NotionJournalManager()
-    yesterday = datetime.now() - timedelta(days=1)
-    source_page = manager.get_page_by_date(yesterday)
+        except Exception as e:
+            logger.error(f"日報複製エラー: {e}")
+            return None
 
-    if source_page:
-        new_page = manager.duplicate_page(source_page, datetime.now())
-        if new_page:
-            logger.info("ページを複製しました")
-    else:
-        logger.info("No page found for today.")
+def main():
+    try:
+        manager = NotionJournalManager()
+        if manager.duplicate_daily_journal():
+            logger.info("日報の複製が完了しました")
+    except NotionError as e:
+        logger.error(f"初期化エラー: {e}")
+    except Exception as e:
+        logger.error(f"予期せぬエラー: {e}")
+
+if __name__ == '__main__':
+    main()
