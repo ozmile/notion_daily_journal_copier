@@ -36,7 +36,9 @@ NOTION_API_KEY=your_api_key
 NOTION_DAILY_JOURNAL_DATABASE_ID=your_database_id
 ```
 
-### Notion のページでコネクトを有効化
+## Notionでやること
+- データベースに「日付」（種類:日付）のプロパティを追加
+- データベースのページでコネクトを有効化
 1. データベースを開き、ページ右上の「...」をクリック
 2. 「コネクト」を選択し、作成したインテグレーションを追加
 

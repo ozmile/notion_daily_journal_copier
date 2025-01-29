@@ -47,11 +47,11 @@ class NotionJournalManager:
             response = self.client.databases.query(
                 database_id=self.config.database_id,
                 filter={
-                    "property": "作成日",
+                    "property": "日付",
                     "date": {"equals": date_str}
                 },
                 page_size=1,
-                sorts=[{"property": "作成日", "direction": "descending"}]
+                sorts=[{"property": "日付", "direction": "descending"}]
             )
             return response['results'][0] if response.get('results') else None
 
@@ -139,7 +139,7 @@ class NotionJournalManager:
             date_str = datetime.now().strftime('%Y-%m-%d')
             new_properties = page_content['properties'].copy()
             new_properties['タイトル']['title'][0]['text']['content'] = "Daily Journal"
-            new_properties['作成日']['date']['start'] = date_str
+            new_properties['日付']['date']['start'] = date_str
             new_properties['タイトル']['title'][1]['mention']['date']['start'] = date_str
 
             # 新規ページ作成
