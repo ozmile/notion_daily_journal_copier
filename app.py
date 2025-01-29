@@ -93,7 +93,7 @@ class NotionJournalManager:
         return converted
 
     def copy_blocks(self, source_id: str, target_id: str) -> bool:
-        """ブロックを再帰的にコピー"""
+        """ブロックを再帰的にコピーして順番を維持"""
         try:
             blocks = self.client.blocks.children.list(source_id)
             for block in blocks.get('results', []):
